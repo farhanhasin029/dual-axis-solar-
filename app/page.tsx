@@ -1,69 +1,149 @@
-import Image from "next/image";
+﻿'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+
+interface TelemetryData {
+  temp: number;
+  hum: number;
+  gas: number;
+  pan: number;
+  tilt: number;
+  ldr: number[];
+  updatedAt?: number;
+  offline?: boolean;
+}
+
+export default function SolarDashboard() {
+  const [data, setData] = useState<TelemetryData | null>(null);
+  const [isOnline, setIsOnline] = useState(false);
+
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const res = await fetch('/api/telemetry', { cache: 'no-store' });
+        const json: TelemetryData = await res.json();
+        if (!json.offline && json.updatedAt) {
+          setData(json);
+          setIsOnline(Date.now() - json.updatedAt < 10000);
+        }
+      } catch {
+        setIsOnline(false);
+      }
+    };
+
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const ldrLabels = [
+    'Top Left (D27)',
+    'Top Right (D26)',
+    'Bottom Left (D25)',
+    'Bottom Right (D33)',
+  ];
+  const ldrStates = data?.ldr || [1, 1, 1, 1];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dual-Axis Solar Tracker</h1>
+            <p className="text-sm text-slate-400">ESP32 Telemetry &amp; Environmental Monitor</p>
+          </div>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              isOnline
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+            }`}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {isOnline ? '● ESP32 Online' : '○ Waiting for ESP32'}
+          </span>
         </div>
-      </main>
-    </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Temperature (DHT22)</p>
+            <p className="text-3xl font-semibold mt-2 text-amber-400">
+              {data ? `${data.temp.toFixed(1)} °C` : '--'}
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Humidity (DHT22)</p>
+            <p className="text-3xl font-semibold mt-2 text-sky-400">
+              {data ? `${data.hum.toFixed(1)} %` : '--'}
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Air Quality (MQ135 Raw)</p>
+            <p className="text-3xl font-semibold mt-2 text-purple-400">
+              {data ? data.gas : '--'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+              Servo Orientation (MG996R)
+            </h2>
+
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span>Horizontal Pan (D19)</span>
+                <span className="font-mono text-amber-400">{data ? `${data.pan}°` : '90°'}</span>
+              </div>
+              <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-300"
+                  style={{ width: `${((data?.pan ?? 90) / 180) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span>Vertical Tilt (D23)</span>
+                <span className="font-mono text-sky-400">{data ? `${data.tilt}°` : '90°'}</span>
+              </div>
+              <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-sky-400 h-full transition-all duration-300"
+                  style={{ width: `${((data?.tilt ?? 90) / 180) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              LDR Quadrant Array
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {ldrLabels.map((label, idx) => {
+                const isLit = ldrStates[idx] === 0;
+                return (
+                  <div
+                    key={label}
+                    className={`p-3 rounded-lg border text-center transition-colors ${
+                      isLit
+                        ? 'bg-amber-400/20 border-amber-400 text-amber-200'
+                        : 'bg-slate-950 border-slate-800 text-slate-500'
+                    }`}
+                  >
+                    <p className="text-xs font-medium">{label}</p>
+                    <p className="text-sm font-bold mt-1">{isLit ? '☀ LIT' : 'SHADED'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
